@@ -4,6 +4,7 @@ from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
+    APP_PORT = 8888
     DB_NAME = 'bs_database'
     DB_USER: str
     DB_PASSWORD: str

@@ -4,3 +4,4 @@ flake8~=4.0
 isort~=5.10
 tornado==6.1
 pydantic[dotenv] ~= 1.9
+sqlalchemy==1.4.32
