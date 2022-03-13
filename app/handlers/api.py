@@ -3,7 +3,7 @@ import json
 import tornado.web
 from models.request import RequestModel
 from modules.request.use_cases import encode_rq_body
-from sqlalchemy import func, insert, select
+from sqlalchemy import delete, insert, select, update
 
 
 class HandlerWithEngineMixin(tornado.web.RequestHandler):
@@ -28,12 +28,24 @@ class ApiAddHandler(HandlerWithEngineMixin):
         rq_body_hash = encode_rq_body(rq_body)
 
         with self.db_engine.connect() as conn:
-            conn.execute(
-                insert(RequestModel).values(
-                    rq_body_hash=rq_body_hash,
-                    rq_body=rq_body
+            duplicates = RequestModel.get_duplicates(conn, rq_body_hash)
+
+            if duplicates:
+                conn.execute(
+                    update(RequestModel).where(
+                        RequestModel.rq_body_hash == rq_body_hash
+                    ).values(
+                        duplicates=duplicates + 1
+                    )
                 )
-            )
+            else:
+                conn.execute(
+                    insert(RequestModel).values(
+                        rq_body_hash=rq_body_hash,
+                        rq_body=rq_body,
+                        duplicates=1
+                    )
+                )
 
         self.write(
             json.dumps({
@@ -62,24 +74,42 @@ class ApiGetHandler(HandlerWithEngineMixin):
 
         with self.db_engine.connect() as conn:
             body = conn.execute(
-                select([RequestModel.rq_body]).where(
-                    RequestModel.rq_body_hash.in_(key)
+                select([RequestModel.rq_body, RequestModel.duplicates]).where(
+                    RequestModel.rq_body_hash == key
                 )
             ).fetchone()
 
-            body = body['rq_body'] if body else {}
+        response = {'duplicates': 0}
 
-            duplicates = conn.execute(
-                select([func.count()]).where(
-                    RequestModel.rq_body_hash.in_(key)
-                )
-            ).fetchone()
-
-        response = {
-            **body,
-            'duplicates': duplicates[0]
-        }
+        if body:
+            response = {
+                'request_body': body['rq_body'],
+                'duplicates': body['duplicates']
+            }
 
         self.write(
             json.dumps(response)
+        )
+
+
+class ApiDeleteHandler(HandlerWithEngineMixin):
+    """
+       Удаляем запрос по ключу.
+    """
+
+    def set_default_headers(self):
+        self.set_header("Content-Type", 'application/json')
+
+    def delete(self, body_hash):
+        with self.db_engine.connect() as conn:
+            conn.execute(
+                delete(RequestModel).where(
+                    RequestModel.rq_body_hash == body_hash
+                )
+            )
+
+        self.write(
+            json.dumps({
+                'message': 'Успешно удалено'
+            })
         )
