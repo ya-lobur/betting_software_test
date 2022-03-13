@@ -178,6 +178,6 @@ class ApiStatisticHandler(HandlerWithEngineMixin):
 
         self.write(
             json.dumps({
-                'result': f'{float(result)} %' if result else None
+                'result': f'{float(result)} %' if result is not None else result
             })
         )

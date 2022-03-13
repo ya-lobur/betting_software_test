@@ -43,5 +43,5 @@ class RequestModel(Base):
             select([func.sum(RequestModel.duplicates)]).select_from(RequestModel)
         ).scalar()
 
-        if duplicates_sum and (unique_rq_count + duplicates_sum) > 0:
+        if duplicates_sum or unique_rq_count > 0:
             return (duplicates_sum / (unique_rq_count + duplicates_sum)) * 100

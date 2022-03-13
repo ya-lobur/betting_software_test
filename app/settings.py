@@ -12,4 +12,4 @@ class Settings(BaseSettings):
     DB_PORT: Union[int, str] = 5432
 
 
-settings = Settings(_env_file='dev.env', _env_file_encoding='utf-8')
+settings = Settings(_env_file='.env', _env_file_encoding='utf-8')
