@@ -113,7 +113,6 @@ class ApiDeleteHandler(HandlerWithEngineMixin):
 
 class ApiUpdateHandler(HandlerWithEngineMixin):
     """
-    Этот хэндлер занимается обработкой входящего тела запроса.
     PUT:
         Обновляет тело и хэш тела.
         Возвращает json с ключом {'key': 'eyJrZXkiOiAiYWFhZHMgYXNkZCJ9'}
@@ -160,5 +159,25 @@ class ApiUpdateHandler(HandlerWithEngineMixin):
         self.write(
             json.dumps({
                 'key': new_body_hash
+            })
+        )
+
+
+class ApiStatisticHandler(HandlerWithEngineMixin):
+    """
+    Получаем % дубликатов от количества общих запросов.
+    В теории может быть больше 100% это будет значить что дублей больше, чем уникальных запросов
+    """
+
+    def set_default_headers(self):
+        self.set_header("Content-Type", 'application/json')
+
+    def get(self):
+        with self.db_engine.connect() as conn:
+            result = RequestModel.get_statistic(conn)
+
+        self.write(
+            json.dumps({
+                'result': f'{float(result)} %' if result else None
             })
         )

@@ -1,6 +1,6 @@
 from db import Base
 from settings import settings
-from sqlalchemy import BigInteger, Column, Integer, String, delete, select
+from sqlalchemy import BigInteger, Column, Integer, String, delete, func, select
 from sqlalchemy.dialects.postgresql import JSONB
 from tornado_sqlalchemy import SQLAlchemy
 
@@ -32,3 +32,20 @@ class RequestModel(Base):
                 RequestModel.rq_body_hash == body_hash
             )
         )
+
+    @staticmethod
+    def get_statistic(conn):
+        """
+        В теории может быть больше 100% это будет значить что дублей больше, чем уникальных запросов
+        """
+
+        unique_rq_count = conn.execute(
+            select([func.count()]).select_from(RequestModel)
+        ).scalar()
+
+        duplicates_sum = conn.execute(
+            select([func.sum(RequestModel.duplicates)]).select_from(RequestModel)
+        ).scalar()
+
+        if duplicates_sum and (unique_rq_count + duplicates_sum) > 0:
+            return (duplicates_sum / (unique_rq_count + duplicates_sum)) * 100
