@@ -3,7 +3,7 @@ import json
 import tornado.web
 from models.request import RequestModel
 from modules.request.use_cases import encode_rq_body
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import insert, select, update
 
 
 class HandlerWithEngineMixin(tornado.web.RequestHandler):
@@ -30,7 +30,7 @@ class ApiAddHandler(HandlerWithEngineMixin):
         with self.db_engine.connect() as conn:
             duplicates = RequestModel.get_duplicates(conn, rq_body_hash)
 
-            if duplicates:
+            if duplicates is not None:
                 conn.execute(
                     update(RequestModel).where(
                         RequestModel.rq_body_hash == rq_body_hash
@@ -43,7 +43,7 @@ class ApiAddHandler(HandlerWithEngineMixin):
                     insert(RequestModel).values(
                         rq_body_hash=rq_body_hash,
                         rq_body=rq_body,
-                        duplicates=1
+                        duplicates=0
                     )
                 )
 
@@ -75,7 +75,7 @@ class ApiGetHandler(HandlerWithEngineMixin):
         with self.db_engine.connect() as conn:
             body = conn.execute(
                 select([RequestModel.rq_body, RequestModel.duplicates]).where(
-                    RequestModel.rq_body_hash == key
+                    RequestModel.rq_body_hash.in_(key)
                 )
             ).fetchone()
 
@@ -102,14 +102,63 @@ class ApiDeleteHandler(HandlerWithEngineMixin):
 
     def delete(self, body_hash):
         with self.db_engine.connect() as conn:
-            conn.execute(
-                delete(RequestModel).where(
-                    RequestModel.rq_body_hash == body_hash
-                )
-            )
+            RequestModel.delete_request_by_body_hash(conn, body_hash)
 
         self.write(
             json.dumps({
                 'message': 'Успешно удалено'
+            })
+        )
+
+
+class ApiUpdateHandler(HandlerWithEngineMixin):
+    """
+    Этот хэндлер занимается обработкой входящего тела запроса.
+    PUT:
+        Обновляет тело и хэш тела.
+        Возвращает json с ключом {'key': 'eyJrZXkiOiAiYWFhZHMgYXNkZCJ9'}
+    """
+
+    def set_default_headers(self):
+        self.set_header("Content-Type", 'application/json')
+
+    def put(self, old_body_hash):
+        rq_body = json.loads(self.request.body)
+        new_body_hash = encode_rq_body(rq_body)
+
+        with self.db_engine.connect() as conn:
+            is_exist = RequestModel.get_duplicates(conn, old_body_hash)
+
+            if is_exist is not None:
+                duplicates = RequestModel.get_duplicates(conn, new_body_hash)
+                if duplicates:
+                    conn.execute(
+                        update(RequestModel).where(
+                            RequestModel.rq_body_hash == new_body_hash
+                        ).values(
+                            duplicates=duplicates + 1
+                        )
+                    )
+                else:
+                    conn.execute(
+                        insert(RequestModel).values(
+                            rq_body_hash=new_body_hash,
+                            rq_body=rq_body,
+                            duplicates=0
+                        )
+                    )
+                RequestModel.delete_request_by_body_hash(conn, old_body_hash)
+            else:
+                self.set_status(400)
+                self.write(
+                    json.dumps({
+                        'message': f'По ключу {old_body_hash} ничего не было найдено'
+                    })
+                )
+                return
+
+        self.write(
+            json.dumps({
+                'key': new_body_hash
             })
         )

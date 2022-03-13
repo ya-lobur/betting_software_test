@@ -1,6 +1,6 @@
 from db import Base
 from settings import settings
-from sqlalchemy import BigInteger, Column, Integer, String, select
+from sqlalchemy import BigInteger, Column, Integer, String, delete, select
 from sqlalchemy.dialects.postgresql import JSONB
 from tornado_sqlalchemy import SQLAlchemy
 
@@ -23,4 +23,12 @@ class RequestModel(Base):
             )
         ).fetchone()
 
-        return result[0] if result else 0
+        return result[0] if result else None
+
+    @staticmethod
+    def delete_request_by_body_hash(conn, body_hash):
+        conn.execute(
+            delete(RequestModel).where(
+                RequestModel.rq_body_hash == body_hash
+            )
+        )

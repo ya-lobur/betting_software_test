@@ -1,6 +1,6 @@
 import tornado.web
 from db import engine
-from handlers.api import ApiAddHandler, ApiDeleteHandler, ApiGetHandler
+from handlers.api import ApiAddHandler, ApiDeleteHandler, ApiGetHandler, ApiUpdateHandler
 from settings import settings
 
 
@@ -11,6 +11,7 @@ class Application(tornado.web.Application):
             (r'/api/add', ApiAddHandler),
             (r'/api/get', ApiGetHandler),
             (r'/api/remove/([\x00-\x7f]+)', ApiDeleteHandler),
+            (r'/api/update/([\x00-\x7f]+)', ApiUpdateHandler),
         ]
 
         tornado.web.Application.__init__(self, handlers, debug=True)
